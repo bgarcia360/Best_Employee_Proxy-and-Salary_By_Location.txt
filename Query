@@ -1,0 +1,48 @@
+WITH --CTE to run both queries 
+Salary_By_Location AS(
+SELECT l.State_Province,
+       d.Department_Name,
+       j.Job_Title, 
+       COUNT(e.Employee_id) as Number_Employees,
+       ROUND(MEDIAN(e.Salary),2) as Median_Salary,
+       Sub.Avg_Length_Month
+FROM Employees e
+LEFT JOIN  Departments d 
+ON e.Department_Id = d.Department_Id
+LEFT JOIN Jobs j
+ON e.Job_Id = j.Job_Id 
+LEFT JOIN Locations l
+ON l.Location_Id=d.Location_Id 
+Left JOIN
+(SELECT Job_Id,
+        ROUND(AVG(MONTHS_BETWEEN(End_Date,Start_Date))) AS Avg_Length_Month
+FROM Job_History
+GROUP BY Job_Id) Sub --subquary to get avg months of each job id
+ON e.Job_Id = Sub.Job_Id
+GROUP BY l.State_Province,d.Department_Name,j.Job_Title,Sub.Avg_Length_Month
+ORDER BY l.State_Province,d.Department_Name,j.Job_Title,COUNT(e.Employee_id) DESC),--End of Query_one CTE                                                                            
+
+Best_Employee_Proxy AS(
+SELECT e.First_Name|| ' ' || e.Last_Name as Full_Name,
+       e.Salary,
+       j.Job_Title, 
+       NTILE(4) over (PARTITION BY e.job_id order by e.salary Desc) as Quartile,
+       ROUND(MONTHS_BETWEEN(SYSDATE,e.Hire_Date))as Months_With_Company
+FROM Employees e
+LEFT JOIN Jobs j
+ON j.Job_Id=e.Job_Id
+INNER JOIN(
+SELECT Job_Id, 
+       COUNT(Job_Id)
+FROM
+Employees
+Group BY Job_Id
+HAVING COUNT(Job_id) > 2)subq--Only want jobs that have more then two job_id 
+ON subq.Job_Id=e.Job_Id      --For NTILE function to work properly
+ORDER BY e.Job_Id,Quartile) --END of Query_Two CTE 
+
+--SELECT *
+--FROM Salary_By_Location
+
+SELECT * 
+FROM Best_Employee_Proxy
